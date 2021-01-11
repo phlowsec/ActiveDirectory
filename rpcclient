@@ -1,0 +1,12 @@
+==============================================================================
+[+] rpclcient enum
+==============================================================================
+
+rpcclient -U "Amanda" 10.10.10.103
+
+# Machine user and grups lists
+rpclcient $> enumdomusers
+rpclcient $> enumdomgroups
+
+
+
