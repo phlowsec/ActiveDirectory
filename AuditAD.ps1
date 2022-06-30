@@ -45,7 +45,7 @@
   Originally Modified by Jeremy@jhouseconsulting.com 13/06/2014
   Subsequently modified by Geoff.Jones@cyberis.co.uk 17/02/2014
   Subsequently modified by info@phlowsec.com 2022-06-22
-    Added DNS Admins and protected Users in the report
+    Added DNS Admins, Cryptographic Operators and Protected Users in the report
 
 #>
 #-------------------------------------------------------------
@@ -190,8 +190,7 @@ Function getForestPrivGroups
   # - Print Operators - SID: S-1-5-32-550
   # Reference: http://support.microsoft.com/kb/243330
   # - DNS Admins
-  # CERT Ops - S-1-5-32-569
-  # replicator - S-1-5-32-552
+  # Cryptographic Operators - S-1-5-32-569
   # ProtectedSID: S-1-5-21domain-525
 
 
@@ -236,7 +235,7 @@ Function getForestPrivGroups
                      $colDASids += $dnsAdm
               }
              
-              $colPrivGroups = @("S-1-5-32-552";"S-1-5-32-569";"S-1-5-32-544";"S-1-5-32-548";"S-1-5-32-549";"S-1-5-32-551";"S-1-5-32-550";"$rootDomainSid-519";"$rootDomainSid-518")
+              $colPrivGroups = @("S-1-5-32-569";"S-1-5-32-544";"S-1-5-32-548";"S-1-5-32-549";"S-1-5-32-551";"S-1-5-32-550";"$rootDomainSid-519";"$rootDomainSid-518")
               $colPrivGroups += $colDASids
               $searcher = $gc.GetDirectorySearcher()
               ForEach($privGroup in $colPrivGroups)
