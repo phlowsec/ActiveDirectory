@@ -44,11 +44,13 @@
   Release 1.3
   Originally Modified by Jeremy@jhouseconsulting.com 13/06/2014
   Subsequently modified by Geoff.Jones@cyberis.co.uk 17/02/2014
+  Subsequently modified by info@phlowsec.com 2022-06-22
+    Added DNS Admins and protected Users in the report
 
 #>
 #-------------------------------------------------------------
 # Set this to maximum number of unique members threshold
-$MaxUniqueMembers = 25
+$MaxUniqueMembers = 99
 
 # Set this to maximum password age threshold
 $MaxPasswordAge = 365
@@ -56,6 +58,9 @@ $MaxPasswordAge = 365
 # Set this to true to privide a detailed output to the console
 $DetailedConsoleOutput = $True
 #-------------------------------------------------------------
+# Get the script path
+$ScriptPath = {Split-Path $MyInvocation.ScriptName}
+$ReferenceFile = $(&$ScriptPath) + "\PrivilegedUsers.csv"
 
 ##################   Function to Expand Group Membership ################
 function getMemberExpanded
@@ -104,6 +109,8 @@ Function getUserAccountAttribs
                            $createdDate = $objuser.properties.item("whenCreated") 
                            ##
 
+                           $displayName = $objuser.properties.item("DisplayName")[0]
+
                            $description = $objuser.properties.item("description")[0]
                            $notes = $objuser.properties.item("info")[0]
                            $notes = $notes -replace "`r`n", "|"
@@ -139,17 +146,28 @@ Function getUserAccountAttribs
                            else {$disabled = "FALSE"}
                            if (($uac -bor 0x10000) -eq $uac) {$passwordneverexpires="TRUE"}
                            else {$passwordNeverExpires = "FALSE"}
+                           if (($uac -bor 0x100000) -eq $uac) {$AccountNotDelegated="TRUE"}
+                           else {$AccountNotDelegated = "FALSE"}
                         }      
+                        
+                        $groupnm = [string]$parentGroup.split(",")[0].split("=")[1]
+                        $temp = [string]$parentGroup -split ',DC='
+                        $domainn = $temp[1]
                                                                           
-                        $record = "" | select-object SamAccountName,DistinguishedName,MemberOf,CreatedDate,PasswordAge,LastLogon,LastLogonInDays,Disabled,PasswordNeverExpires,AccountExpires,Description,Notes
+                        $record = "" | select-object SamAccountName,DistinguishedName,DisplayName,MemberOf,Group,Domain,CreatedDate,PasswordAge,LastLogon,LastLogonInDays,uac,Disabled,AccountNotDelegated,PasswordNeverExpires,AccountExpires,Description,Notes
                         $record.SamAccountName = [string]$sam
                         $record.DistinguishedName = [string]$dn
+                        $record.displayName = $DisplayName
                         $record.MemberOf = [string]$parentGroup
+                        $record.Group = $groupnm
+                        $record.Domain = $domainn
                         $record.CreatedDate = [string]$createdDate
                         $record.PasswordAge = $PasswordAge
                         $record.LastLogon = $lastLogon
                         $record.LastLogonInDays = $lastLogonInDays
+                        $record.uac = $uac
                         $record.Disabled = $disabled
+                        $record.AccountNotDelegated  = $AccountNotDelegated 
                         $record.PasswordNeverExpires = $passwordNeverExpires
                         $record.AccountExpires = $accountexpires
                         $record.Description = $description
@@ -171,6 +189,11 @@ Function getForestPrivGroups
   # - Backup Operators - SID: S-1-5-32-551
   # - Print Operators - SID: S-1-5-32-550
   # Reference: http://support.microsoft.com/kb/243330
+  # - DNS Admins
+  # CERT Ops - S-1-5-32-569
+  # replicator - S-1-5-32-552
+  # ProtectedSID: S-1-5-21domain-525
+
 
                 $colOfDNs = @()
                 $Forest = [System.DirectoryServices.ActiveDirectory.forest]::getcurrentforest()
@@ -205,12 +228,16 @@ Function getForestPrivGroups
                      $colDASids += $daSid
                      $cpSid = "$DomainSID-517"
                      $colDASids += $cpSid
+                     $puSid = "$DomainSID-525"
+                     $colDASids += $puSid
+                     $dnsAdmObj = [adsi]"LDAP://CN=DnsAdmins,CN=Users,$domainDN"
+                     $dnsAdm = New-Object System.Security.Principal.SecurityIdentifier($dnsAdmObj.objectSID[0], 0)
+                     $dnsADm = $dnsAdm.ToString()
+                     $colDASids += $dnsAdm
               }
-
-
-              $colPrivGroups = @("S-1-5-32-544";"S-1-5-32-548";"S-1-5-32-549";"S-1-5-32-551";"S-1-5-32-550";"$rootDomainSid-519";"$rootDomainSid-518")
+             
+              $colPrivGroups = @("S-1-5-32-552";"S-1-5-32-569";"S-1-5-32-544";"S-1-5-32-548";"S-1-5-32-549";"S-1-5-32-551";"S-1-5-32-550";"$rootDomainSid-519";"$rootDomainSid-518")
               $colPrivGroups += $colDASids
-                
               $searcher = $gc.GetDirectorySearcher()
               ForEach($privGroup in $colPrivGroups)
                 {
@@ -242,9 +269,6 @@ Function FQDN2DN
 }
 
 ########################## MAIN ###########################
-# Get the script path
-$ScriptPath = {Split-Path $MyInvocation.ScriptName}
-$ReferenceFile = $(&$ScriptPath) + "\PrivilegedUsers.csv"
 
 $forestPrivGroups = GetForestPrivGroups
 $colAllPrivUsers = @()
@@ -259,6 +283,7 @@ Foreach ($privGroup in $forestPrivGroups)
                 $colOfMembersExpanded = @()
               $colofUniqueMembers = @()
                 $members = getmemberexpanded $privGroup
+                
                 If ($members)
                 {
                                 $uniqueMembers = $members | sort-object -unique

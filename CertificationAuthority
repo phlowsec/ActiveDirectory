@@ -1,5 +1,0 @@
-==============================================================================
-[+] Generate Request of Certificate Linux openssl
-==============================================================================
-
-openssl req -newkey rsa:2048 -nodes -keyout amanda.key -out amanda.csr
